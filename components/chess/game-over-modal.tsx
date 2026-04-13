@@ -19,7 +19,8 @@ interface GameOverModalProps {
 }
 
 export function GameOverModal({ open, onOpenChange }: GameOverModalProps) {
-  const { result, history, resetGame, exportPgn } = useGame()
+  const { result, history, resetGame, exportPgn, currentGame } = useGame()
+  const canAnalyzeFinishedGame = currentGame?.status === "FINISHED" && Boolean(currentGame.gameId)
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -89,12 +90,19 @@ export function GameOverModal({ open, onOpenChange }: GameOverModalProps) {
               <RotateCcw className="h-4 w-4" />
               Rematch
             </Button>
-            <Button variant="secondary" className="flex-1 gap-2 transition-all duration-200 active:scale-[0.98]" asChild>
-              <Link href="/analysis">
+            {canAnalyzeFinishedGame ? (
+              <Button variant="secondary" className="flex-1 gap-2 transition-all duration-200 active:scale-[0.98]" asChild>
+                <Link href={`/analysis?game=${currentGame.gameId}`}>
+                  <LineChart className="h-4 w-4" />
+                  Analyze
+                </Link>
+              </Button>
+            ) : (
+              <Button variant="secondary" className="flex-1 gap-2 transition-all duration-200 active:scale-[0.98]" disabled>
                 <LineChart className="h-4 w-4" />
                 Analyze
-              </Link>
-            </Button>
+              </Button>
+            )}
           </div>
         </div>
       </DialogContent>

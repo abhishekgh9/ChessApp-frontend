@@ -37,8 +37,8 @@ export function createMovePayload(
 
   const selectedPromotion =
     (requestedPromotion &&
-      promotionMoves.find((move) => move.promotion === requestedPromotion)?.promotion) ??
-    promotionMoves.find((move) => move.promotion === "q")?.promotion ??
+      normalizePromotion(promotionMoves.find((move) => move.promotion === requestedPromotion)?.promotion)) ??
+    normalizePromotion(promotionMoves.find((move) => move.promotion === "q")?.promotion) ??
     normalizePromotion(promotionMoves[0]?.promotion)
 
   if (!selectedPromotion) {

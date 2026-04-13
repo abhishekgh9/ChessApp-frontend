@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useMemo, useState } from "react"
+import { useRouter } from "next/navigation"
 import {
   Award,
   Calendar,
@@ -25,6 +26,52 @@ import { cn } from "@/lib/utils"
 
 const timeControls = ["bullet", "blitz", "rapid"] as const
 
+type RecentGameRecord = {
+  gameId: string
+  status: string | null
+  result: string | null
+  createdAt: string | null
+  updatedAt: string | null
+  timeControl: string | null
+}
+
+function readString(value: unknown) {
+  return typeof value === "string" ? value : null
+}
+
+function toRecentGameRecord(game: Record<string, unknown>): RecentGameRecord | null {
+  const gameId = readString(game.gameId)
+  if (!gameId) {
+    return null
+  }
+
+  return {
+    gameId,
+    status: readString(game.status),
+    result: readString(game.result),
+    createdAt: readString(game.createdAt),
+    updatedAt: readString(game.updatedAt),
+    timeControl: readString(game.timeControl),
+  }
+}
+
+function formatResult(result: string | null) {
+  if (!result) {
+    return "Result unavailable"
+  }
+
+  switch (result) {
+    case "WHITE_WIN":
+      return "White won"
+    case "BLACK_WIN":
+      return "Black won"
+    case "DRAW":
+      return "Draw"
+    default:
+      return result.replaceAll("_", " ")
+  }
+}
+
 function Panel({
   title,
   description,
@@ -46,6 +93,7 @@ function Panel({
 }
 
 export default function ProfilePage() {
+  const router = useRouter()
   const [selectedTimeControl, setSelectedTimeControl] = useState<typeof timeControls[number]>("blitz")
   const [profile, setProfile] = useState<ProfileResponse | null>(null)
   const [isLoading, setIsLoading] = useState(false)
@@ -98,6 +146,10 @@ export default function ProfilePage() {
   }
 
   const selectedRatings = useMemo(() => profile?.ratings ?? {}, [profile])
+  const recentGames = useMemo(
+    () => (profile?.recentGames ?? []).map((game) => toRecentGameRecord(game)).filter((game): game is RecentGameRecord => Boolean(game)),
+    [profile?.recentGames],
+  )
 
   return (
     <AppLayout>
@@ -244,32 +296,74 @@ export default function ProfilePage() {
               <TabsContent value="games">
                 <ScrollArea className="h-[420px] pr-2">
                   <div className="space-y-3">
-                    {(profile?.recentGames ?? []).length === 0 ? (
+                    {recentGames.length === 0 ? (
                       <div className="rounded-[24px] border border-white/10 bg-black/20 p-4 text-sm text-slate-400">
                         No recent games returned by the backend yet.
                       </div>
                     ) : (
-                      profile?.recentGames.map((game, idx) => (
-                        <div
-                          key={String(game.gameId ?? idx)}
-                          className="flex flex-col gap-3 rounded-[24px] border border-white/10 bg-black/20 p-4 lg:flex-row lg:items-center lg:justify-between"
-                        >
+                      recentGames.map((game, idx) => {
+                        const isFinished = game.status === "FINISHED"
+                        const timestamp = game.updatedAt ?? game.createdAt
+
+                        return (
+                          <button
+                            key={game.gameId}
+                            type="button"
+                            onClick={() => isFinished && router.push(`/analysis?game=${encodeURIComponent(game.gameId)}`)}
+                            disabled={!isFinished}
+                            className={cn(
+                              "flex w-full flex-col gap-3 rounded-[24px] border p-4 text-left transition-all lg:flex-row lg:items-center lg:justify-between",
+                              isFinished
+                                ? "border-primary/20 bg-primary/[0.07] hover:bg-primary/[0.11]"
+                                : "border-white/10 bg-black/20 opacity-90",
+                            )}
+                          >
                           <div className="flex items-center gap-3">
                             <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-primary/15 text-sm font-semibold text-primary">
                               #{idx + 1}
                             </div>
                             <div>
-                              <p className="font-semibold text-white">{String(game.gameId ?? "Game")}</p>
-                              <p className="text-sm text-slate-400">Persisted game archive entry</p>
+                              <div className="flex flex-wrap items-center gap-2">
+                                <p className="font-semibold text-white">{game.gameId}</p>
+                                <Badge
+                                  className={cn(
+                                    "rounded-full border px-2.5 py-1 text-xs font-medium",
+                                    isFinished
+                                      ? "border-primary/20 bg-primary/12 text-primary"
+                                      : "border-amber-400/20 bg-amber-400/10 text-amber-200",
+                                  )}
+                                >
+                                  {game.status?.replaceAll("_", " ") ?? "Unknown"}
+                                </Badge>
+                              </div>
+                              <p className="text-sm text-slate-400">
+                                {isFinished
+                                  ? "Open post-game analysis"
+                                  : "Post-game analysis unlocks after the game is finished"}
+                              </p>
+                              <p className="mt-1 text-xs text-slate-500">
+                                {formatResult(game.result)}
+                                {game.timeControl ? ` • ${game.timeControl}` : ""}
+                                {timestamp
+                                  ? ` • ${new Date(timestamp).toLocaleDateString(undefined, {
+                                      month: "short",
+                                      day: "numeric",
+                                      year: "numeric",
+                                    })}`
+                                  : ""}
+                              </p>
                             </div>
                           </div>
 
                           <div className="flex items-center gap-4 text-sm">
-                            <span className="text-slate-400">Backend record</span>
-                            <ChevronRight className="h-4 w-4 text-slate-500" />
+                            <span className={cn("text-slate-400", isFinished && "text-primary")}>
+                              {isFinished ? "View analysis" : "Finished games only"}
+                            </span>
+                            <ChevronRight className={cn("h-4 w-4", isFinished ? "text-primary" : "text-slate-500")} />
                           </div>
-                        </div>
-                      ))
+                          </button>
+                        )
+                      })
                     )}
                   </div>
                 </ScrollArea>

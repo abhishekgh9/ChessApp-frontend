@@ -142,6 +142,48 @@ export interface LeaderboardEntry {
   winRate: number
 }
 
+export type FideTimeControl = "standard" | "rapid" | "blitz"
+export type FideGenderFilter = "open" | "male" | "female"
+export type FideDivisionFilter = "open" | "junior" | "senior"
+
+export interface FideLeaderboardEntry {
+  rank: number
+  fideId: number
+  name: string
+  title: string | null
+  country: string | null
+  gender: string | null
+  birthYear: number | null
+  timeControl: FideTimeControl
+  rating: number
+  gamesPlayed: number | null
+  inactive: boolean
+}
+
+export interface FideLeaderboardResponse {
+  timeControl: FideTimeControl
+  gender: FideGenderFilter
+  division: FideDivisionFilter
+  country: string | null
+  query: string | null
+  page: number
+  size: number
+  totalEntries: number
+  lastSyncedAt: string | null
+  entries: FideLeaderboardEntry[]
+}
+
+export interface FideLeaderboardParams {
+  query?: string
+  timeControl?: FideTimeControl
+  country?: string
+  gender?: FideGenderFilter
+  division?: FideDivisionFilter
+  page?: number
+  size?: number
+  activeOnly?: boolean
+}
+
 export interface AnalysisResponse {
   analysisId: string
   sourceType: string
@@ -288,6 +330,21 @@ export const profileApi = {
 export const leaderboardApi = {
   list: (query?: string) =>
     apiRequest<LeaderboardEntry[]>(`/api/leaderboard${query ? `?query=${encodeURIComponent(query)}` : ""}`, { method: "GET" }),
+  fideList: (params: FideLeaderboardParams = {}) => {
+    const searchParams = new URLSearchParams()
+
+    if (params.query) searchParams.set("query", params.query)
+    if (params.timeControl) searchParams.set("timeControl", params.timeControl)
+    if (params.country) searchParams.set("country", params.country)
+    if (params.gender) searchParams.set("gender", params.gender)
+    if (params.division) searchParams.set("division", params.division)
+    if (params.page !== undefined) searchParams.set("page", String(params.page))
+    if (params.size !== undefined) searchParams.set("size", String(params.size))
+    if (params.activeOnly !== undefined) searchParams.set("activeOnly", String(params.activeOnly))
+
+    const query = searchParams.toString()
+    return apiRequest<FideLeaderboardResponse>(`/api/leaderboard/fide${query ? `?${query}` : ""}`, { method: "GET" })
+  },
 }
 
 export const analysisApi = {

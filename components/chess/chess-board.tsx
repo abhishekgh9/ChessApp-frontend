@@ -283,7 +283,7 @@ export function ChessBoard({ gameId }: ChessBoardProps) {
   )
 
   const onDrop = useCallback(
-    async (sourceSquare: Square, targetSquare: Square) => {
+    (sourceSquare: Square, targetSquare: Square) => {
       if (!canMoveCurrentTurn || isSubmittingMove) {
         return false
       }
@@ -293,15 +293,19 @@ export function ChessBoard({ gameId }: ChessBoardProps) {
         return false
       }
 
-      const success = await makeMove(sourceSquare, targetSquare)
-      if (success) {
+      void makeMove(sourceSquare, targetSquare).then((success) => {
+        if (!success) {
+          return
+        }
+
         if (currentGameId && !currentGame?.isBotGame) {
           sendMove({ gameId: currentGameId, ...movePayload })
         }
         setMoveFrom(null)
         setOptionSquares({})
-      }
-      return success
+      })
+
+      return true
     },
     [canMoveCurrentTurn, currentGame?.isBotGame, currentGameId, isSubmittingMove, makeMove, sendMove],
   )
