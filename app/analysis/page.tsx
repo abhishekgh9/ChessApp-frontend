@@ -1,6 +1,7 @@
 "use client"
 
 import { Suspense, useCallback, useEffect, useMemo, useState } from "react"
+import type { CSSProperties } from "react"
 import { useSearchParams } from "next/navigation"
 import { Chess, Square } from "chess.js"
 import { Chessboard } from "react-chessboard"
@@ -21,6 +22,20 @@ import { toast } from "sonner"
 
 import { useAuth } from "@/components/chess/auth-context"
 import { AppLayout } from "@/components/chess/app-layout"
+import { DataPill, InsetPanel, MetricCard } from "@/components/design-system/product"
+import {
+  AnalysisPanel as Panel,
+  BoardArrow,
+  PlayerSummaryCard,
+  PostGameErrorState,
+  classificationAccent,
+  classificationTone,
+  formatAccuracy,
+  formatEval,
+  formatRatingDelta,
+  formatResult,
+  parseUciMove,
+} from "@/features/analysis/components/review-ui"
 import { Button } from "@/components/ui/button"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
@@ -28,7 +43,6 @@ import { Textarea } from "@/components/ui/textarea"
 import {
   AnalysisResponse,
   BackendError,
-  PostGameAnalysisPlayerSummary,
   PostGameAnalysisResponse,
   analysisApi,
   gamesApi,
@@ -36,226 +50,6 @@ import {
 } from "@/lib/backend"
 import { createMovePayload, toChessMoveInput } from "@/lib/chess-move"
 import { cn } from "@/lib/utils"
-
-type BoardArrow = [Square, Square, string?]
-
-function Panel({
-  title,
-  description,
-  children,
-}: {
-  title: string
-  description: string
-  children: React.ReactNode
-}) {
-  return (
-    <section className="rounded-[30px] border border-white/10 bg-white/[0.05] p-5 shadow-[0_28px_70px_rgba(0,0,0,0.24)]">
-      <div className="mb-4">
-        <h2 className="text-lg font-semibold text-white">{title}</h2>
-        <p className="text-sm text-slate-400">{description}</p>
-      </div>
-      {children}
-    </section>
-  )
-}
-
-function formatEval(value: number) {
-  return `${value > 0 ? "+" : ""}${value.toFixed(2)}`
-}
-
-function formatAccuracy(value: number) {
-  return `${value.toFixed(2)}%`
-}
-
-function formatRatingDelta(value: number) {
-  return `${value >= 0 ? "+" : ""}${value}`
-}
-
-function formatResult(result: PostGameAnalysisResponse["result"]) {
-  if (result === "WHITE_WIN") return "White won"
-  if (result === "BLACK_WIN") return "Black won"
-  return "Draw"
-}
-
-function classificationTone(classification: string) {
-  switch (classification) {
-    case "best":
-      return "border-cyan-400/20 bg-cyan-400/10 text-cyan-300"
-    case "excellent":
-      return "border-sky-400/20 bg-sky-400/10 text-sky-300"
-    case "good":
-      return "border-emerald-400/20 bg-emerald-400/10 text-emerald-300"
-    case "inaccuracy":
-      return "border-amber-400/20 bg-amber-400/10 text-amber-300"
-    case "mistake":
-      return "border-orange-400/20 bg-orange-400/10 text-orange-300"
-    case "blunder":
-      return "border-red-400/20 bg-red-400/10 text-red-300"
-    default:
-      return "border-white/10 bg-white/[0.04] text-slate-300"
-  }
-}
-
-function classificationAccent(classification: string) {
-  switch (classification) {
-    case "best":
-      return {
-        label: "Best",
-        badgeClassName: "border-cyan-300/30 bg-cyan-300 text-slate-950",
-        arrowColor: "rgba(34, 211, 238, 0.92)",
-        squareColor: "rgba(34, 211, 238, 0.34)",
-      }
-    case "excellent":
-      return {
-        label: "Excellent",
-        badgeClassName: "border-sky-300/30 bg-sky-300 text-slate-950",
-        arrowColor: "rgba(56, 189, 248, 0.92)",
-        squareColor: "rgba(56, 189, 248, 0.32)",
-      }
-    case "good":
-      return {
-        label: "Good",
-        badgeClassName: "border-emerald-300/30 bg-emerald-300 text-slate-950",
-        arrowColor: "rgba(52, 211, 153, 0.92)",
-        squareColor: "rgba(52, 211, 153, 0.32)",
-      }
-    case "inaccuracy":
-      return {
-        label: "Inaccuracy",
-        badgeClassName: "border-amber-300/30 bg-amber-300 text-slate-950",
-        arrowColor: "rgba(251, 191, 36, 0.92)",
-        squareColor: "rgba(251, 191, 36, 0.34)",
-      }
-    case "mistake":
-      return {
-        label: "Mistake",
-        badgeClassName: "border-orange-300/30 bg-orange-300 text-slate-950",
-        arrowColor: "rgba(251, 146, 60, 0.92)",
-        squareColor: "rgba(251, 146, 60, 0.34)",
-      }
-    case "blunder":
-      return {
-        label: "Blunder",
-        badgeClassName: "border-red-300/30 bg-red-300 text-slate-950",
-        arrowColor: "rgba(248, 113, 113, 0.94)",
-        squareColor: "rgba(248, 113, 113, 0.34)",
-      }
-    default:
-      return {
-        label: classification,
-        badgeClassName: "border-white/10 bg-white text-slate-950",
-        arrowColor: "rgba(255, 255, 255, 0.92)",
-        squareColor: "rgba(255, 255, 255, 0.28)",
-      }
-  }
-}
-
-function parseUciMove(uciMove: string) {
-  const normalized = uciMove.trim().toLowerCase()
-  if (normalized.length < 4) {
-    return null
-  }
-
-  return {
-    from: normalized.slice(0, 2) as Square,
-    to: normalized.slice(2, 4) as Square,
-    promotion: normalized.length > 4 ? normalized.slice(4, 5) : undefined,
-  }
-}
-
-function PlayerSummaryCard({
-  title,
-  summary,
-  highlighted = false,
-}: {
-  title: string
-  summary: PostGameAnalysisPlayerSummary
-  highlighted?: boolean
-}) {
-  return (
-    <div
-      className={cn(
-        "rounded-[24px] border bg-black/20 p-4",
-        highlighted ? "border-primary/30 bg-primary/10" : "border-white/10",
-      )}
-    >
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <p className="text-sm font-medium text-slate-300">{title}</p>
-          <p className="mt-1 text-xs uppercase tracking-[0.18em] text-slate-500">{summary.color}</p>
-        </div>
-        <span className="rounded-full border border-white/10 bg-white/[0.04] px-3 py-1 text-xs text-slate-300">
-          {summary.movesAnalyzed} moves
-        </span>
-      </div>
-      <div className="mt-4 grid grid-cols-2 gap-3">
-        <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-3">
-          <p className="text-xs text-slate-500">Accuracy</p>
-          <p className="mt-1 text-lg font-semibold text-white">{formatAccuracy(summary.accuracy)}</p>
-        </div>
-        <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-3">
-          <p className="text-xs text-slate-500">Current rating</p>
-          <p className="mt-1 text-lg font-semibold text-white">{summary.currentRating}</p>
-        </div>
-        <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-3">
-          <p className="text-xs text-slate-500">Provisional rating</p>
-          <p className="mt-1 text-lg font-semibold text-white">{summary.provisionalRating}</p>
-        </div>
-        <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-3">
-          <p className="text-xs text-slate-500">Rating delta</p>
-          <p className="mt-1 text-lg font-semibold text-white">{formatRatingDelta(summary.ratingDelta)}</p>
-        </div>
-      </div>
-    </div>
-  )
-}
-
-function PostGameErrorState({
-  code,
-  message,
-  onSignIn,
-}: {
-  code: string | null
-  message: string
-  onSignIn: () => void
-}) {
-  const isRestricted = code === "not_game_participant"
-  const requiresFinishedGame = code === "game_analysis_requires_finished_game"
-  const requiresAuth = code === "unauthorized"
-  const isEngineIssue =
-    code === "stockfish_unavailable" || code === "stockfish_timeout" || code === "game_contains_illegal_moves"
-
-  return (
-    <div
-      className={cn(
-        "rounded-[24px] border p-5",
-        isRestricted || requiresFinishedGame || requiresAuth
-          ? "border-amber-400/20 bg-amber-400/10 text-amber-100"
-          : isEngineIssue
-            ? "border-red-400/20 bg-red-400/10 text-red-100"
-            : "border-white/10 bg-black/20 text-slate-200",
-      )}
-    >
-      <p className="text-base font-semibold text-white">
-        {requiresAuth
-          ? "Sign in required"
-          : isRestricted
-            ? "Access restricted"
-            : requiresFinishedGame
-              ? "Finished game required"
-              : isEngineIssue
-                ? "Analysis unavailable"
-                : "Unable to load analysis"}
-      </p>
-      <p className="mt-2 text-sm">{message}</p>
-      {requiresAuth && (
-        <Button onClick={onSignIn} className="mt-4 rounded-2xl">
-          Sign in
-        </Button>
-      )}
-    </div>
-  )
-}
 
 function AnalysisPageContent() {
   const searchParams = useSearchParams()
@@ -288,7 +82,7 @@ function AnalysisPageContent() {
       const response = await analysisApi.fromPgn(pgn)
       setAnalysis(response)
       if (!response.valid) {
-        toast.error("The backend could not parse that PGN.")
+        toast.error("That PGN could not be parsed.")
       } else {
         toast.success("PGN analysis loaded.")
       }
@@ -307,7 +101,7 @@ function AnalysisPageContent() {
       const response = await analysisApi.fromFen(fen)
       setAnalysis(response)
       if (!response.valid) {
-        toast.error("The backend could not parse that FEN.")
+        toast.error("That FEN could not be parsed.")
       } else {
         toast.success("FEN analysis loaded.")
       }
@@ -542,12 +336,12 @@ function AnalysisPageContent() {
 
     return arrows
   }, [selectedMoveAccent?.arrowColor, selectedPostGameMove])
-  const postGameSquareStyles = useMemo<Record<string, React.CSSProperties>>(() => {
+  const postGameSquareStyles = useMemo<Record<string, CSSProperties>>(() => {
     if (!selectedPostGameMove) {
       return {}
     }
 
-    const styles: Record<string, React.CSSProperties> = {}
+    const styles: Record<string, CSSProperties> = {}
     const playedMove = parseUciMove(selectedPostGameMove.uciMove)
     if (playedMove) {
       styles[playedMove.from] = {
@@ -648,64 +442,45 @@ function AnalysisPageContent() {
           {gameId && (
             <Panel
               title="Post-game analysis"
-              description="Finished-game analysis is loaded from the backend with authenticated access and uses the backend response fields as the source of truth."
+              description="A move-by-move review of the finished game with accuracy, performance, and key decision points."
             >
               {isLoadingPostGame ? (
-                <div className="rounded-[24px] border border-white/10 bg-black/20 p-5 text-sm text-slate-300">
-                  Loading finished-game analysis...
-                </div>
+                <InsetPanel className="p-5 text-sm text-slate-300">Loading finished-game analysis...</InsetPanel>
               ) : postGameError ? (
                 <PostGameErrorState code={postGameErrorCode} message={postGameError} onSignIn={() => openAuthModal("login")} />
               ) : postGameAnalysis ? (
                 <div className="space-y-4">
                   <div className="grid gap-4 xl:grid-cols-[minmax(0,1.35fr)_minmax(320px,0.9fr)]">
-                    <div className="rounded-[26px] border border-primary/20 bg-[linear-gradient(135deg,rgba(93,214,150,0.16),rgba(255,255,255,0.04))] p-5">
+                    <div className="surface-hero p-5">
                       <div className="flex flex-wrap items-start justify-between gap-4">
                         <div>
-                          <p className="text-xs uppercase tracking-[0.22em] text-primary/80">Your Analysis</p>
+                          <p className="section-eyebrow">Your performance</p>
                           <p className="mt-2 text-4xl font-semibold text-white">{formatAccuracy(postGameAnalysis.requestedPlayer.accuracy)}</p>
                           <p className="mt-2 text-sm text-slate-200">
-                            Overall accuracy for this game: <span className="font-semibold text-white">{formatAccuracy(postGameAnalysis.overallAccuracy)}</span>
+                            Overall game accuracy: <span className="font-semibold text-white">{formatAccuracy(postGameAnalysis.overallAccuracy)}</span>
                           </p>
                         </div>
-                        <span className="rounded-full border border-white/10 bg-black/20 px-3 py-1 text-sm text-slate-200">
-                          {formatResult(postGameAnalysis.result)}
-                        </span>
+                        <DataPill>{formatResult(postGameAnalysis.result)}</DataPill>
                       </div>
 
                       <div className="mt-5 grid gap-3 sm:grid-cols-3">
-                        <div className="rounded-[22px] border border-white/10 bg-black/20 p-4">
-                          <p className="text-xs text-slate-500">Current rating</p>
-                          <p className="mt-2 text-2xl font-semibold text-white">{postGameAnalysis.requestedPlayer.currentRating}</p>
-                        </div>
-                        <div className="rounded-[22px] border border-white/10 bg-black/20 p-4">
-                          <p className="text-xs text-slate-500">Provisional rating</p>
-                          <p className="mt-2 text-2xl font-semibold text-white">{postGameAnalysis.requestedPlayer.provisionalRating}</p>
-                        </div>
-                        <div className="rounded-[22px] border border-white/10 bg-black/20 p-4">
-                          <p className="text-xs text-slate-500">Rating delta</p>
-                          <p className="mt-2 text-2xl font-semibold text-white">{formatRatingDelta(postGameAnalysis.requestedPlayer.ratingDelta)}</p>
-                        </div>
+                        <MetricCard label="Current rating" value={postGameAnalysis.requestedPlayer.currentRating} />
+                        <MetricCard label="Performance rating" value={postGameAnalysis.requestedPlayer.provisionalRating} />
+                        <MetricCard label="Rating delta" value={formatRatingDelta(postGameAnalysis.requestedPlayer.ratingDelta)} />
                       </div>
                     </div>
 
-                    <div className="rounded-[26px] border border-white/10 bg-black/20 p-5">
-                      <p className="text-xs uppercase tracking-[0.18em] text-slate-500">Report card</p>
+                    <InsetPanel className="p-5">
+                      <p className="data-label">Summary</p>
                       <div className="mt-4 grid gap-3 sm:grid-cols-2">
-                        <div className="rounded-[22px] border border-white/10 bg-white/[0.03] p-4">
-                          <p className="text-xs text-slate-500">Overall accuracy</p>
-                          <p className="mt-2 text-2xl font-semibold text-white">{formatAccuracy(postGameAnalysis.overallAccuracy)}</p>
-                        </div>
-                        <div className="rounded-[22px] border border-white/10 bg-white/[0.03] p-4">
-                          <p className="text-xs text-slate-500">Moves analyzed</p>
-                          <p className="mt-2 text-2xl font-semibold text-white">{postGameAnalysis.requestedPlayer.movesAnalyzed}</p>
-                        </div>
+                        <MetricCard label="Overall accuracy" value={formatAccuracy(postGameAnalysis.overallAccuracy)} />
+                        <MetricCard label="Moves reviewed" value={postGameAnalysis.requestedPlayer.movesAnalyzed} />
                       </div>
-                    </div>
+                    </InsetPanel>
                   </div>
 
                   <div className="rounded-[24px] border border-amber-400/20 bg-amber-400/10 p-4 text-sm text-amber-100">
-                    Provisional rating is analysis-only output from the backend and does not update the saved account rating.
+                    Performance rating is an analysis estimate and does not change your saved account rating.
                   </div>
 
                   <div className="grid gap-4 lg:grid-cols-2">
@@ -714,17 +489,15 @@ function AnalysisPageContent() {
                     <PlayerSummaryCard title="Black" summary={postGameAnalysis.black} highlighted={postGameAnalysis.requestedPlayer.color === "black"} />
                   </div>
 
-                  <div className="rounded-[24px] border border-white/10 bg-black/20 p-4">
+                  <InsetPanel className="p-4">
                     <div className="mb-3 flex items-center justify-between gap-3">
                       <div>
                         <p className="text-sm font-medium text-white">Move-by-move review</p>
                         <p className="text-sm text-slate-400">
-                          `bestMove` and `uciMove` are displayed in UCI notation exactly as returned by the backend.
+                          Played moves and best moves are shown in UCI notation for accurate comparison.
                         </p>
                       </div>
-                      <span className="rounded-full border border-white/10 bg-white/[0.04] px-3 py-1 text-xs text-slate-300">
-                        {formatResult(postGameAnalysis.result)}
-                      </span>
+                      <DataPill>{formatResult(postGameAnalysis.result)}</DataPill>
                     </div>
 
                     <ScrollArea className="h-[420px]">
@@ -739,7 +512,7 @@ function AnalysisPageContent() {
                           <span>Eval after</span>
                         </div>
                         {postGameAnalysis.moves.length === 0 ? (
-                          <div className="px-4 py-8 text-sm text-slate-400">No analyzed moves were returned by the backend.</div>
+                          <div className="px-4 py-8 text-sm text-slate-400">No reviewed moves are available for this game.</div>
                         ) : (
                           postGameAnalysis.moves.map((move, index) => (
                             <button
@@ -767,19 +540,17 @@ function AnalysisPageContent() {
                         )}
                       </div>
                     </ScrollArea>
-                  </div>
+                  </InsetPanel>
                 </div>
               ) : (
-                <div className="rounded-[24px] border border-white/10 bg-black/20 p-5 text-sm text-slate-300">
-                  No finished-game analysis loaded yet.
-                </div>
+                <InsetPanel className="p-5 text-sm text-slate-300">No finished-game analysis is available yet.</InsetPanel>
               )}
             </Panel>
           )}
 
-          <Panel title="Board workspace" description="Manual analysis now uses the live backend PGN and FEN routes, while keeping the same study workflow.">
+          <Panel title="Board workspace" description="Review positions, step through lines, and inspect candidate moves without losing board focus.">
             <div className="space-y-5">
-              <div className="relative rounded-[26px] border border-white/10 bg-black/20 p-3 sm:p-4">
+              <InsetPanel className="relative rounded-[1.5rem] p-3 sm:p-4">
                 {selectedPostGameMove && selectedMoveAccent && (
                   <>
                     <div className="pointer-events-none absolute left-6 top-6 z-10 flex items-center gap-2">
@@ -816,68 +587,68 @@ function AnalysisPageContent() {
                   customDarkSquareStyle={{ backgroundColor: "#6B4E34" }}
                   customLightSquareStyle={{ backgroundColor: "#E8D9B5" }}
                 />
-              </div>
+              </InsetPanel>
 
               {isPostGameMode ? (
-                <div className="rounded-[24px] border border-white/10 bg-black/20 p-3">
+                <InsetPanel className="p-3">
                   <div className="flex flex-wrap items-center gap-3">
-                    <Button variant="secondary" size="icon" onClick={goToPostGameStart} disabled={selectedPostGameMoveIndex < 0} className="rounded-xl border border-white/10 bg-white/[0.06] text-white hover:bg-white/[0.1]">
+                    <Button variant="secondary" size="icon" onClick={goToPostGameStart} disabled={selectedPostGameMoveIndex < 0} className="control-base rounded-xl text-white hover:bg-white/[0.08]">
                       <SkipBack className="h-4 w-4" />
                     </Button>
-                    <Button variant="secondary" size="icon" onClick={goToPostGamePrev} disabled={selectedPostGameMoveIndex < 0} className="rounded-xl border border-white/10 bg-white/[0.06] text-white hover:bg-white/[0.1]">
+                    <Button variant="secondary" size="icon" onClick={goToPostGamePrev} disabled={selectedPostGameMoveIndex < 0} className="control-base rounded-xl text-white hover:bg-white/[0.08]">
                       <ChevronLeft className="h-4 w-4" />
                     </Button>
-                    <Button variant="secondary" size="icon" onClick={goToPostGameNext} disabled={!postGameAnalysis || selectedPostGameMoveIndex >= postGameAnalysis.moves.length - 1} className="rounded-xl border border-white/10 bg-white/[0.06] text-white hover:bg-white/[0.1]">
+                    <Button variant="secondary" size="icon" onClick={goToPostGameNext} disabled={!postGameAnalysis || selectedPostGameMoveIndex >= postGameAnalysis.moves.length - 1} className="control-base rounded-xl text-white hover:bg-white/[0.08]">
                       <ChevronRight className="h-4 w-4" />
                     </Button>
-                    <Button variant="secondary" size="icon" onClick={goToPostGameEnd} disabled={!postGameAnalysis || selectedPostGameMoveIndex >= postGameAnalysis.moves.length - 1} className="rounded-xl border border-white/10 bg-white/[0.06] text-white hover:bg-white/[0.1]">
+                    <Button variant="secondary" size="icon" onClick={goToPostGameEnd} disabled={!postGameAnalysis || selectedPostGameMoveIndex >= postGameAnalysis.moves.length - 1} className="control-base rounded-xl text-white hover:bg-white/[0.08]">
                       <SkipForward className="h-4 w-4" />
                     </Button>
                     <div className="h-8 w-px bg-white/10" />
-                    <Button variant="secondary" onClick={() => setBoardOrientation((o) => (o === "white" ? "black" : "white"))} className="rounded-xl border border-white/10 bg-white/[0.06] text-white hover:bg-white/[0.1]">
+                    <Button variant="secondary" onClick={() => setBoardOrientation((o) => (o === "white" ? "black" : "white"))} className="control-base rounded-xl text-white hover:bg-white/[0.08]">
                       <RotateCcw className="h-4 w-4" />
                       Flip board
                     </Button>
-                    <Button variant="secondary" onClick={copyFen} className="rounded-xl border border-white/10 bg-white/[0.06] text-white hover:bg-white/[0.1]">
+                    <Button variant="secondary" onClick={copyFen} className="control-base rounded-xl text-white hover:bg-white/[0.08]">
                       <Copy className="h-4 w-4" />
                       Copy FEN
                     </Button>
                   </div>
                   <p className="mt-3 text-sm text-slate-400">
-                    Selecting a move in the review table updates the board using the backend UCI move timeline.
+                    Select any reviewed move to jump the board directly to that position.
                   </p>
                   <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-slate-400">
-                    <span className="rounded-full border border-white/10 bg-white/[0.04] px-2.5 py-1">Colored arrow = played move</span>
-                    <span className="rounded-full border border-white/10 bg-white/[0.04] px-2.5 py-1">White guide = engine best move</span>
+                    <DataPill className="px-2.5 py-1">Colored arrow = played move</DataPill>
+                    <DataPill className="px-2.5 py-1">White guide = best move</DataPill>
                   </div>
-                </div>
+                </InsetPanel>
               ) : (
-                <div className="flex flex-wrap items-center gap-3 rounded-[24px] border border-white/10 bg-black/20 p-3">
-                  <Button variant="secondary" size="icon" onClick={goToStart} disabled={moveIndex < 0} className="rounded-xl border border-white/10 bg-white/[0.06] text-white hover:bg-white/[0.1]">
+                <InsetPanel className="flex flex-wrap items-center gap-3 p-3">
+                  <Button variant="secondary" size="icon" onClick={goToStart} disabled={moveIndex < 0} className="control-base rounded-xl text-white hover:bg-white/[0.08]">
                     <SkipBack className="h-4 w-4" />
                   </Button>
-                  <Button variant="secondary" size="icon" onClick={goToPrev} disabled={moveIndex < 0} className="rounded-xl border border-white/10 bg-white/[0.06] text-white hover:bg-white/[0.1]">
+                  <Button variant="secondary" size="icon" onClick={goToPrev} disabled={moveIndex < 0} className="control-base rounded-xl text-white hover:bg-white/[0.08]">
                     <ChevronLeft className="h-4 w-4" />
                   </Button>
-                  <Button variant="secondary" size="icon" onClick={goToNext} disabled={moveIndex >= history.length - 1} className="rounded-xl border border-white/10 bg-white/[0.06] text-white hover:bg-white/[0.1]">
+                  <Button variant="secondary" size="icon" onClick={goToNext} disabled={moveIndex >= history.length - 1} className="control-base rounded-xl text-white hover:bg-white/[0.08]">
                     <ChevronRight className="h-4 w-4" />
                   </Button>
-                  <Button variant="secondary" size="icon" onClick={goToEnd} disabled={moveIndex >= history.length - 1} className="rounded-xl border border-white/10 bg-white/[0.06] text-white hover:bg-white/[0.1]">
+                  <Button variant="secondary" size="icon" onClick={goToEnd} disabled={moveIndex >= history.length - 1} className="control-base rounded-xl text-white hover:bg-white/[0.08]">
                     <SkipForward className="h-4 w-4" />
                   </Button>
                   <div className="h-8 w-px bg-white/10" />
-                  <Button variant="secondary" onClick={() => setBoardOrientation((o) => (o === "white" ? "black" : "white"))} className="rounded-xl border border-white/10 bg-white/[0.06] text-white hover:bg-white/[0.1]">
+                  <Button variant="secondary" onClick={() => setBoardOrientation((o) => (o === "white" ? "black" : "white"))} className="control-base rounded-xl text-white hover:bg-white/[0.08]">
                     <RotateCcw className="h-4 w-4" />
                     Flip board
                   </Button>
-                  <Button variant="secondary" onClick={copyFen} className="rounded-xl border border-white/10 bg-white/[0.06] text-white hover:bg-white/[0.1]">
+                  <Button variant="secondary" onClick={copyFen} className="control-base rounded-xl text-white hover:bg-white/[0.08]">
                     <Copy className="h-4 w-4" />
                     Copy FEN
                   </Button>
-                  <Button variant="secondary" onClick={() => void runFenAnalysis()} className="rounded-xl border border-white/10 bg-white/[0.06] text-white hover:bg-white/[0.1]" disabled={isAnalyzing}>
+                  <Button variant="secondary" onClick={() => void runFenAnalysis()} className="control-base rounded-xl text-white hover:bg-white/[0.08]" disabled={isAnalyzing}>
                     Analyze FEN
                   </Button>
-                </div>
+                </InsetPanel>
               )}
             </div>
           </Panel>
@@ -888,22 +659,22 @@ function AnalysisPageContent() {
             title={isPostGameMode ? "Replay sidebar" : "Analysis tools"}
             description={
               isPostGameMode
-                ? "Review the backend move timeline and jump the board to any analyzed move."
-                : "Manual PGN and FEN analysis are wired directly to the current backend contract."
+                ? "Review the move list and jump the board to any key moment."
+                : "Import a game, review the move list, and inspect evaluation patterns."
             }
           >
             <Tabs defaultValue="moves" className="min-h-0 gap-4">
-              <TabsList className={cn("grid h-auto w-full rounded-[20px] border border-white/10 bg-black/20 p-1", isPostGameMode ? "grid-cols-1" : "grid-cols-3")}>
-                <TabsTrigger value="moves" className="h-11 rounded-2xl data-[state=active]:bg-primary/15 data-[state=active]:text-primary">
+              <TabsList className={cn("grid h-auto w-full rounded-xl border border-white/10 bg-black/20 p-1", isPostGameMode ? "grid-cols-1" : "grid-cols-3")}>
+                <TabsTrigger value="moves" className="h-11 rounded-lg data-[state=active]:bg-primary/15 data-[state=active]:text-primary">
                   Moves
                 </TabsTrigger>
                 {!isPostGameMode && (
-                  <TabsTrigger value="import" className="h-11 rounded-2xl data-[state=active]:bg-primary/15 data-[state=active]:text-primary">
+                  <TabsTrigger value="import" className="h-11 rounded-lg data-[state=active]:bg-primary/15 data-[state=active]:text-primary">
                     Import
                   </TabsTrigger>
                 )}
                 {!isPostGameMode && (
-                  <TabsTrigger value="stats" className="h-11 rounded-2xl data-[state=active]:bg-primary/15 data-[state=active]:text-primary">
+                  <TabsTrigger value="stats" className="h-11 rounded-lg data-[state=active]:bg-primary/15 data-[state=active]:text-primary">
                     Stats
                   </TabsTrigger>
                 )}
@@ -1039,11 +810,11 @@ function AnalysisPageContent() {
                 <div className="space-y-4">
                   {!analysis ? (
                     <div className="rounded-[24px] border border-white/10 bg-black/20 p-4 text-sm text-slate-300">
-                      Run a manual PGN or FEN analysis to see backend results here.
+                      Run a manual PGN or FEN analysis to see the review summary here.
                     </div>
                   ) : !analysis.valid ? (
                     <div className="rounded-[24px] border border-amber-400/20 bg-amber-400/10 p-4 text-sm text-amber-100">
-                      The backend marked this input as invalid. Best move, evaluation, and classifications were intentionally returned empty.
+                      This input could not be analyzed. Best move, evaluation, and classifications are unavailable.
                     </div>
                   ) : null}
 
@@ -1060,7 +831,7 @@ function AnalysisPageContent() {
                   <div className="rounded-[24px] border border-white/10 bg-black/20 p-4">
                     <p className="text-sm text-slate-400">Best move</p>
                     <p className="mt-2 font-mono text-2xl font-semibold text-white">{analysis?.bestMove ?? "--"}</p>
-                    <p className="mt-1 text-xs text-slate-500">UCI from the backend</p>
+                    <p className="mt-1 text-xs text-slate-500">UCI notation</p>
                     <p className="mt-3 text-sm text-slate-400">Evaluation</p>
                     <p className="mt-1 text-lg font-medium text-white">{analysis ? formatEval(analysis.evaluation) : "--"}</p>
                     <p className="mt-4 text-sm text-slate-400">Classification trail</p>

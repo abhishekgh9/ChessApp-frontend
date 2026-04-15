@@ -7,15 +7,16 @@ import {
   ChevronLeft,
   ChevronRight,
   Filter,
-  Medal,
-  Minus,
   Search,
-  TrendingDown,
-  TrendingUp,
-  Trophy,
 } from "lucide-react"
 
 import { AppLayout } from "@/components/chess/app-layout"
+import { InsetPanel, ProductPanel } from "@/components/design-system/product"
+import {
+  FideTableRow,
+  RankBadge,
+  RatingChange,
+} from "@/features/leaderboard/components/ranking-ui"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
 import {
@@ -38,7 +39,6 @@ import { Switch } from "@/components/ui/switch"
 import {
   Table,
   TableBody,
-  TableCell,
   TableHead,
   TableHeader,
   TableRow,
@@ -47,7 +47,6 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import {
   FideDivisionFilter,
   FideGenderFilter,
-  FideLeaderboardEntry,
   FideLeaderboardResponse,
   FideTimeControl,
   LeaderboardEntry,
@@ -83,92 +82,6 @@ const dateTimeFormatter = new Intl.DateTimeFormat("en-US", {
   dateStyle: "medium",
   timeStyle: "short",
 })
-
-function RankBadge({ rank }: { rank: number }) {
-  if (rank === 1) {
-    return (
-      <div className="flex h-11 w-11 items-center justify-center rounded-2xl border border-yellow-400/25 bg-yellow-400/15">
-        <Trophy className="h-5 w-5 text-yellow-300" />
-      </div>
-    )
-  }
-  if (rank === 2) {
-    return (
-      <div className="flex h-11 w-11 items-center justify-center rounded-2xl border border-slate-300/25 bg-slate-300/10">
-        <Medal className="h-5 w-5 text-slate-200" />
-      </div>
-    )
-  }
-  if (rank === 3) {
-    return (
-      <div className="flex h-11 w-11 items-center justify-center rounded-2xl border border-amber-500/25 bg-amber-500/10">
-        <Medal className="h-5 w-5 text-amber-300" />
-      </div>
-    )
-  }
-  return (
-    <div className="flex h-11 w-11 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.03] text-sm font-semibold text-slate-300">
-      {rank}
-    </div>
-  )
-}
-
-function RatingChange({ change }: { change: number }) {
-  if (change > 0) {
-    return (
-      <span className="inline-flex items-center gap-1 rounded-full border border-emerald-400/20 bg-emerald-400/10 px-2.5 py-1 text-xs font-medium text-emerald-300">
-        <TrendingUp className="h-3 w-3" />
-        +{change}
-      </span>
-    )
-  }
-  if (change < 0) {
-    return (
-      <span className="inline-flex items-center gap-1 rounded-full border border-red-400/20 bg-red-400/10 px-2.5 py-1 text-xs font-medium text-red-300">
-        <TrendingDown className="h-3 w-3" />
-        {change}
-      </span>
-    )
-  }
-  return (
-    <span className="inline-flex items-center gap-1 rounded-full border border-white/10 bg-white/[0.04] px-2.5 py-1 text-xs font-medium text-slate-400">
-      <Minus className="h-3 w-3" />
-      0
-    </span>
-  )
-}
-
-function FideTableRow({ player }: { player: FideLeaderboardEntry }) {
-  return (
-    <TableRow className="border-white/10 hover:bg-white/[0.04]">
-      <TableCell className="font-semibold text-white">{player.rank}</TableCell>
-      <TableCell className="min-w-[220px]">
-        <div className="flex flex-col">
-          <span className="font-semibold text-white">{player.name}</span>
-          <span className="text-xs text-slate-400">FIDE ID {player.fideId}</span>
-        </div>
-      </TableCell>
-      <TableCell className="text-slate-300">{player.title ?? "-"}</TableCell>
-      <TableCell className="text-slate-300">{player.country ?? "-"}</TableCell>
-      <TableCell className="text-right font-semibold text-white">{player.rating}</TableCell>
-      <TableCell className="text-right text-slate-300">{player.gamesPlayed ?? "-"}</TableCell>
-      <TableCell className="text-slate-300">{player.gender ?? "-"}</TableCell>
-      <TableCell className="text-slate-300">{player.birthYear ?? "-"}</TableCell>
-      <TableCell className="text-right">
-        <span
-          className={cn(
-            "inline-flex rounded-full border px-2.5 py-1 text-xs font-medium",
-            player.inactive
-              ? "border-amber-400/20 bg-amber-400/10 text-amber-200"
-              : "border-emerald-400/20 bg-emerald-400/10 text-emerald-300",
-          )}
-        >
-          {player.inactive ? "Inactive" : "Active"}
-        </span>
-      </TableCell>
-    </TableRow>
-  )
-}
 
 export default function LeaderboardPage() {
   const [source, setSource] = useState<LeaderboardSource>("app")
@@ -272,16 +185,16 @@ export default function LeaderboardPage() {
   return (
     <AppLayout>
       <div className="mx-auto flex w-full max-w-[1500px] flex-col gap-6 pb-24">
-        <section className="rounded-[32px] border border-white/10 bg-white/[0.05] p-5 shadow-[0_28px_70px_rgba(0,0,0,0.24)] lg:p-6">
+        <ProductPanel strong className="p-5 lg:p-6">
           <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
             <div className="max-w-3xl">
-              <p className="text-xs font-semibold uppercase tracking-[0.24em] text-primary/80">Global rankings</p>
-              <h2 className="mt-2 text-3xl font-semibold text-white">
+              <p className="section-eyebrow">Global rankings</p>
+              <h2 className="section-title mt-2">
                 {source === "app" ? "Live app leaderboard" : "Official FIDE leaderboard"}
               </h2>
-              <p className="mt-2 text-sm text-slate-400">
+              <p className="section-copy mt-2">
                 {source === "app"
-                  ? "Search the current in-app rankings. Time-control tabs remain available in the UI while the backend continues serving one shared app leaderboard."
+                  ? "Search current club standings and move between the main competitive formats."
                   : "Browse official FIDE ratings with federation, division, gender, activity, and time-control filters."}
               </p>
               {source === "fide" && fideData?.lastSyncedAt && (
@@ -293,11 +206,11 @@ export default function LeaderboardPage() {
 
             <div className="w-full max-w-md">
               <Tabs value={source} onValueChange={(value) => setSource(value as LeaderboardSource)}>
-                <TabsList className="grid h-auto w-full grid-cols-2 rounded-[20px] border border-white/10 bg-black/20 p-1">
-                  <TabsTrigger value="app" className="h-11 rounded-2xl data-[state=active]:bg-primary/15 data-[state=active]:text-primary">
+                <TabsList className="grid h-auto w-full grid-cols-2 rounded-xl border border-white/10 bg-black/20 p-1">
+                  <TabsTrigger value="app" className="h-11 rounded-lg data-[state=active]:bg-primary/15 data-[state=active]:text-primary">
                     App
                   </TabsTrigger>
-                  <TabsTrigger value="fide" className="h-11 rounded-2xl data-[state=active]:bg-primary/15 data-[state=active]:text-primary">
+                  <TabsTrigger value="fide" className="h-11 rounded-lg data-[state=active]:bg-primary/15 data-[state=active]:text-primary">
                     FIDE
                   </TabsTrigger>
                 </TabsList>
@@ -315,12 +228,12 @@ export default function LeaderboardPage() {
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     onKeyDown={(e) => e.key === "Enter" && submitAppSearch()}
-                    className="h-12 rounded-2xl border-white/10 bg-black/20 pl-11 text-white placeholder:text-slate-500"
+                    className="control-base h-12 rounded-xl pl-11 text-white placeholder:text-slate-500"
                   />
                 </div>
                 <Button
                   variant="secondary"
-                  className="h-12 rounded-2xl border border-white/10 bg-white/[0.06] text-white hover:bg-white/[0.1]"
+                  className="control-base h-12 rounded-xl text-white hover:bg-white/[0.08]"
                   onClick={submitAppSearch}
                 >
                   <Filter className="h-4 w-4" />
@@ -330,17 +243,17 @@ export default function LeaderboardPage() {
 
               <div className="mt-5">
                 <Tabs value={timeControl} onValueChange={setTimeControl}>
-                  <TabsList className="grid h-auto w-full grid-cols-2 rounded-[20px] border border-white/10 bg-black/20 p-1 sm:grid-cols-4 lg:w-[480px]">
-                    <TabsTrigger value="bullet" className="h-11 rounded-2xl data-[state=active]:bg-primary/15 data-[state=active]:text-primary">
+                  <TabsList className="grid h-auto w-full grid-cols-2 rounded-xl border border-white/10 bg-black/20 p-1 sm:grid-cols-4 lg:w-[480px]">
+                    <TabsTrigger value="bullet" className="h-11 rounded-lg data-[state=active]:bg-primary/15 data-[state=active]:text-primary">
                       Bullet
                     </TabsTrigger>
-                    <TabsTrigger value="blitz" className="h-11 rounded-2xl data-[state=active]:bg-primary/15 data-[state=active]:text-primary">
+                    <TabsTrigger value="blitz" className="h-11 rounded-lg data-[state=active]:bg-primary/15 data-[state=active]:text-primary">
                       Blitz
                     </TabsTrigger>
-                    <TabsTrigger value="rapid" className="h-11 rounded-2xl data-[state=active]:bg-primary/15 data-[state=active]:text-primary">
+                    <TabsTrigger value="rapid" className="h-11 rounded-lg data-[state=active]:bg-primary/15 data-[state=active]:text-primary">
                       Rapid
                     </TabsTrigger>
-                    <TabsTrigger value="classical" className="h-11 rounded-2xl data-[state=active]:bg-primary/15 data-[state=active]:text-primary">
+                    <TabsTrigger value="classical" className="h-11 rounded-lg data-[state=active]:bg-primary/15 data-[state=active]:text-primary">
                       Classical
                     </TabsTrigger>
                   </TabsList>
@@ -353,14 +266,14 @@ export default function LeaderboardPage() {
                 value={fideFilters.timeControl}
                 onValueChange={(value) => updateFideFilters({ timeControl: value as FideTimeControl })}
               >
-                <TabsList className="grid h-auto w-full grid-cols-3 rounded-[20px] border border-white/10 bg-black/20 p-1 lg:w-[420px]">
-                  <TabsTrigger value="standard" className="h-11 rounded-2xl data-[state=active]:bg-primary/15 data-[state=active]:text-primary">
+                <TabsList className="grid h-auto w-full grid-cols-3 rounded-xl border border-white/10 bg-black/20 p-1 lg:w-[420px]">
+                  <TabsTrigger value="standard" className="h-11 rounded-lg data-[state=active]:bg-primary/15 data-[state=active]:text-primary">
                     Standard
                   </TabsTrigger>
-                  <TabsTrigger value="rapid" className="h-11 rounded-2xl data-[state=active]:bg-primary/15 data-[state=active]:text-primary">
+                  <TabsTrigger value="rapid" className="h-11 rounded-lg data-[state=active]:bg-primary/15 data-[state=active]:text-primary">
                     Rapid
                   </TabsTrigger>
-                  <TabsTrigger value="blitz" className="h-11 rounded-2xl data-[state=active]:bg-primary/15 data-[state=active]:text-primary">
+                  <TabsTrigger value="blitz" className="h-11 rounded-lg data-[state=active]:bg-primary/15 data-[state=active]:text-primary">
                     Blitz
                   </TabsTrigger>
                 </TabsList>
@@ -374,7 +287,7 @@ export default function LeaderboardPage() {
                     value={fideSearchInput}
                     onChange={(e) => setFideSearchInput(e.target.value)}
                     onKeyDown={(e) => e.key === "Enter" && submitFideSearch()}
-                    className="h-12 rounded-2xl border-white/10 bg-black/20 pl-11 text-white placeholder:text-slate-500"
+                    className="control-base h-12 rounded-xl pl-11 text-white placeholder:text-slate-500"
                   />
                 </div>
 
@@ -386,14 +299,14 @@ export default function LeaderboardPage() {
                       country: e.target.value.toUpperCase().slice(0, 3),
                     })
                   }
-                  className="h-12 rounded-2xl border-white/10 bg-black/20 text-white placeholder:text-slate-500"
+                  className="control-base h-12 rounded-xl text-white placeholder:text-slate-500"
                 />
 
                 <Select
                   value={fideFilters.gender}
                   onValueChange={(value) => updateFideFilters({ gender: value as FideGenderFilter })}
                 >
-                  <SelectTrigger className="h-12 w-full rounded-2xl border-white/10 bg-black/20 text-white">
+                  <SelectTrigger className="control-base h-12 w-full rounded-xl text-white">
                     <SelectValue placeholder="Gender" />
                   </SelectTrigger>
                   <SelectContent>
@@ -407,7 +320,7 @@ export default function LeaderboardPage() {
                   value={fideFilters.division}
                   onValueChange={(value) => updateFideFilters({ division: value as FideDivisionFilter })}
                 >
-                  <SelectTrigger className="h-12 w-full rounded-2xl border-white/10 bg-black/20 text-white">
+                  <SelectTrigger className="control-base h-12 w-full rounded-xl text-white">
                     <SelectValue placeholder="Division" />
                   </SelectTrigger>
                   <SelectContent>
@@ -419,7 +332,7 @@ export default function LeaderboardPage() {
 
                 <Button
                   variant="secondary"
-                  className="h-12 rounded-2xl border border-white/10 bg-white/[0.06] text-white hover:bg-white/[0.1]"
+                  className="control-base h-12 rounded-xl text-white hover:bg-white/[0.08]"
                   onClick={submitFideSearch}
                 >
                   <Filter className="h-4 w-4" />
@@ -427,7 +340,7 @@ export default function LeaderboardPage() {
                 </Button>
               </div>
 
-              <div className="flex flex-col gap-3 rounded-[24px] border border-white/10 bg-black/20 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+              <InsetPanel className="flex flex-col gap-3 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
                 <label className="flex items-center gap-3 text-sm text-slate-300">
                   <Switch
                     checked={fideFilters.activeOnly}
@@ -442,7 +355,7 @@ export default function LeaderboardPage() {
                     value={String(fideFilters.size)}
                     onValueChange={(value) => updateFideFilters({ size: Number(value) })}
                   >
-                    <SelectTrigger className="h-10 w-[92px] rounded-xl border-white/10 bg-white/[0.04] text-white">
+                    <SelectTrigger className="control-base h-10 w-[92px] rounded-lg text-white">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -452,13 +365,13 @@ export default function LeaderboardPage() {
                     </SelectContent>
                   </Select>
                 </div>
-              </div>
+              </InsetPanel>
             </div>
           )}
-        </section>
+        </ProductPanel>
 
         {source === "app" ? (
-          <section className="rounded-[32px] border border-white/10 bg-white/[0.05] p-4 shadow-[0_28px_70px_rgba(0,0,0,0.24)] lg:p-5">
+          <ProductPanel className="p-4 lg:p-5">
             <div className="mb-3 hidden grid-cols-[100px_minmax(0,1.6fr)_140px_140px_140px_120px] gap-3 px-4 text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 xl:grid">
               <span>Rank</span>
               <span>Player</span>
@@ -548,9 +461,9 @@ export default function LeaderboardPage() {
                 <ChevronDown className="h-4 w-4" />
               </Button>
             </div>
-          </section>
+          </ProductPanel>
         ) : (
-          <section className="rounded-[32px] border border-white/10 bg-white/[0.05] p-4 shadow-[0_28px_70px_rgba(0,0,0,0.24)] lg:p-5">
+          <ProductPanel className="p-4 lg:p-5">
             {isFideLoading ? (
               <div className="flex min-h-[320px] items-center justify-center rounded-[26px] border border-white/10 bg-black/20">
                 <div className="flex items-center gap-3 text-sm text-slate-300">
@@ -641,7 +554,7 @@ export default function LeaderboardPage() {
                 </div>
               </>
             )}
-          </section>
+          </ProductPanel>
         )}
       </div>
     </AppLayout>

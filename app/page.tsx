@@ -36,9 +36,9 @@ function HomeShell() {
 
   return (
     <AppLayout>
-      <div className="mx-auto flex w-full max-w-[1600px] flex-col gap-6 pb-24 xl:grid xl:grid-cols-[minmax(0,1fr)_420px] xl:items-start">
+      <div className="mx-auto flex w-full max-w-[1600px] flex-col gap-6 pb-24 xl:grid xl:grid-cols-[minmax(0,1fr)_400px] xl:items-start">
         <ChessBoard gameId={gameId ?? undefined} />
-        <div className="min-w-0 xl:sticky xl:top-[112px] xl:h-[calc(100vh-9rem)]">
+        <div className="min-w-0 xl:sticky xl:top-[104px] xl:h-[calc(100vh-8.5rem)]">
           <RightSidebar />
         </div>
       </div>
