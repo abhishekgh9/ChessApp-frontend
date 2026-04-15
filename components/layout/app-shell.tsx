@@ -12,6 +12,7 @@ import {
   LogIn,
   LogOut,
   Menu,
+  Puzzle,
   Settings,
   Swords,
   Trophy,
@@ -36,6 +37,7 @@ import { cn } from "@/lib/utils"
 const navItems = [
   { icon: Swords, label: "Play", href: "/" },
   { icon: Bot, label: "Play Bot", href: "/?bot=true" },
+  { icon: Puzzle, label: "Puzzles", href: "/puzzles" },
   { icon: LineChart, label: "Analysis", href: "/analysis" },
   { icon: Trophy, label: "Leaderboard", href: "/leaderboard" },
   { icon: User, label: "Profile", href: "/profile" },
@@ -62,6 +64,16 @@ const pageMeta: Record<string, { eyebrow: string; title: string; description: st
     title: "Measure progress over time",
     description: "Ratings, recent results, and achievements organized for fast reading.",
   },
+  "/puzzles": {
+    eyebrow: "Puzzles",
+    title: "Train with tactical puzzle sets",
+    description: "Browse daily and themed puzzles, solve from FEN, and track your solving streak.",
+  },
+  "/puzzles/progress": {
+    eyebrow: "Puzzle progress",
+    title: "Track puzzle accuracy and streaks",
+    description: "See how many puzzles you solved, current streak momentum, and success rate.",
+  },
 }
 
 function isActivePath(pathname: string, href: string) {
@@ -74,7 +86,10 @@ function isActivePath(pathname: string, href: string) {
 
 export function AppShell({ children }: { children: ReactNode }) {
   const pathname = usePathname()
-  const meta = pageMeta[pathname] ?? pageMeta["/"]
+  const meta =
+    pageMeta[pathname] ??
+    (pathname.startsWith("/puzzles") ? pageMeta["/puzzles"] : undefined) ??
+    pageMeta["/"]
   const [mobileNavOpen, setMobileNavOpen] = useState(false)
   const [showSettingsModal, setShowSettingsModal] = useState(false)
   const { user, isAuthenticated, isBootstrapping, openAuthModal, logout } = useAuth()
