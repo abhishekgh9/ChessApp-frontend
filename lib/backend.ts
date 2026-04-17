@@ -201,6 +201,63 @@ export interface FideLeaderboardParams {
   activeOnly?: boolean
 }
 
+export type PuzzleDifficulty = "easy" | "medium" | "hard"
+
+export interface PuzzleSummary {
+  id: string
+  title: string
+  description: string
+  fen: string
+  difficulty: PuzzleDifficulty
+  primaryTheme: string
+  tags: string[]
+  maxWrongAttempts: number
+  totalSolutionSteps: number
+}
+
+export interface PuzzleListResponse {
+  items: PuzzleSummary[]
+  page: number
+  size: number
+  totalElements: number
+  totalPages: number
+}
+
+export interface DailyPuzzleResponse extends PuzzleSummary {
+  dailyDate: string
+}
+
+export interface PuzzleAttemptRequest {
+  move: string
+  timeSpentSeconds: number
+  hintsUsed: number
+}
+
+export interface PuzzleAttemptResponse {
+  attemptId: string
+  puzzleId: string
+  status: "correct" | "incorrect" | "completed" | "failed"
+  correct: boolean
+  completed: boolean
+  failed: boolean
+  attemptCount: number
+  remainingAttempts: number
+  solvedSteps: number
+  totalSteps: number
+  awardedScore: number
+  currentStreak: number
+  fen: string
+  message: string
+}
+
+export interface PuzzleProgressResponse {
+  attemptedCount: number
+  solvedCount: number
+  successRate: number
+  currentStreak: number
+  bestStreak: number
+}
+
 export interface AnalysisResponse {
   analysisId: string
   sourceType: string
@@ -371,6 +428,33 @@ export const analysisApi = {
     apiRequest<AnalysisResponse>("/api/analysis/fen", { method: "POST", body: { fen } }),
 }
 
+export const puzzlesApi = {
+  list: (params: {
+    difficulty?: PuzzleDifficulty
+    theme?: string
+    page?: number
+    size?: number
+  } = {}) => {
+    const searchParams = new URLSearchParams()
+
+    if (params.difficulty) searchParams.set("difficulty", params.difficulty)
+    if (params.theme) searchParams.set("theme", params.theme)
+    if (params.page !== undefined) searchParams.set("page", String(params.page))
+    if (params.size !== undefined) searchParams.set("size", String(params.size))
+
+    const query = searchParams.toString()
+    return apiRequest<PuzzleListResponse>(`/api/puzzles${query ? `?${query}` : ""}`, { method: "GET" })
+  },
+  daily: () =>
+    apiRequest<DailyPuzzleResponse>("/api/puzzles/daily", { method: "GET" }),
+  detail: (id: string) =>
+    apiRequest<PuzzleSummary>(`/api/puzzles/${id}`, { method: "GET" }),
+  submitAttempt: (token: string, id: string, body: PuzzleAttemptRequest) =>
+    apiRequest<PuzzleAttemptResponse>(`/api/puzzles/${id}/attempts`, { method: "POST", token, body }),
+  progress: (token: string) =>
+    apiRequest<PuzzleProgressResponse>("/api/puzzles/me/progress", { method: "GET", token }),
+}
+
 export const matchmakingApi = {
   join: (token: string, body: { timeControl: string; rated: boolean }) =>
     apiRequest<MatchmakingStatusResponse>("/api/matchmaking/join", { method: "POST", token, body }),
@@ -411,6 +495,15 @@ export function getErrorMessage(error: unknown, fallback: string) {
     }
     if (error.code === "stockfish_timeout") {
       return "The engine took too long to respond. Please try again."
+    }
+    if (error.code === "invalid_move_format") {
+      return "Enter a move in UCI format, like e2e4 or a7a8q."
+    }
+    if (error.code === "puzzle_not_found") {
+      return "That puzzle could not be found."
+    }
+    if (error.code === "puzzle_attempt_locked") {
+      return "This puzzle attempt is locked because it was already completed or failed."
     }
     return error.code.replaceAll("_", " ")
   }
