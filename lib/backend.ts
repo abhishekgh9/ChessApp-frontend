@@ -71,19 +71,36 @@ export interface GameMoveSummary {
   [key: string]: unknown
 }
 
+export type GameStatus = "WAITING" | "ACTIVE" | "FINISHED" | string
+export type GameResultCode = "WHITE_WIN" | "BLACK_WIN" | "DRAW" | null
+export type GameResultReasonCode =
+  | "CHECKMATE"
+  | "STALEMATE"
+  | "THREEFOLD_REPETITION"
+  | "INSUFFICIENT_MATERIAL"
+  | "FIFTY_MOVE_RULE"
+  | "DRAW"
+  | "RESIGNATION"
+  | "DRAW_AGREED"
+  | string
+  | null
+
 export interface GameResponse {
   gameId: string
   whitePlayerId: string | null
   blackPlayerId: string | null
+  // Canonical board state in standard 6-field FEN format.
   fen: string
+  // Canonical PGN text with headers, SAN moves, and result.
   pgn: string
+  // Canonical move history as SAN entries. Legacy cached snapshots may still include object entries.
   history: Array<string | GameMoveSummary>
   timeControl: string
   whiteTimeRemaining: number
   blackTimeRemaining: number
-  status: string
-  result: string | null
-  resultReason: string | null
+  status: GameStatus
+  result: GameResultCode
+  resultReason: GameResultReasonCode
   lastMove: GameMoveSummary | null
   rated: boolean
   isBotGame: boolean
@@ -366,7 +383,10 @@ export const matchmakingApi = {
 export function getErrorMessage(error: unknown, fallback: string) {
   if (error instanceof BackendError) {
     if (error.code === "illegal_move") {
-      return "That move is illegal in the current position."
+      return "Illegal move."
+    }
+    if (error.code === "promotion_required") {
+      return "Promotion piece required."
     }
     if (error.code === "validation_failed") {
       return "The request data was invalid."

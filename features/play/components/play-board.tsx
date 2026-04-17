@@ -432,7 +432,7 @@ export function PlayBoard({ gameId }: { gameId?: string }) {
                   <div className="animate-fade-in-scale surface-panel-strong w-full max-w-sm p-6 text-center">
                     <p className="section-eyebrow">Result</p>
                     <h2 className="mt-2 text-2xl font-semibold text-white">{result.summary}</h2>
-                    <p className="mt-2 text-sm uppercase tracking-[0.2em] text-muted-foreground">{result.reason}</p>
+                    <p className="mt-2 text-sm text-muted-foreground">{result.reason}</p>
                   </div>
                 </div>
               ) : null}

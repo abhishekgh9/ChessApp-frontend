@@ -23,7 +23,8 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { profileApi, ProfileResponse } from "@/lib/backend"
+import { GameResultCode, GameResultReasonCode, profileApi, ProfileResponse } from "@/lib/backend"
+import { buildGameResultSummary, formatGameResultReason } from "@/lib/game-result"
 import { cn } from "@/lib/utils"
 
 const timeControls = ["bullet", "blitz", "rapid"] as const
@@ -32,6 +33,7 @@ type RecentGameRecord = {
   gameId: string
   status: string | null
   result: string | null
+  resultReason: string | null
   createdAt: string | null
   updatedAt: string | null
   timeControl: string | null
@@ -51,13 +53,26 @@ function toRecentGameRecord(game: Record<string, unknown>): RecentGameRecord | n
     gameId,
     status: readString(game.status),
     result: readString(game.result),
+    resultReason: readString(game.resultReason),
     createdAt: readString(game.createdAt),
     updatedAt: readString(game.updatedAt),
     timeControl: readString(game.timeControl),
   }
 }
 
-function formatResult(result: string | null) {
+function formatResult(result: string | null, reason: string | null) {
+  if (!result && !reason) {
+    return "Result unavailable"
+  }
+
+  if (result === "WHITE_WIN" || result === "BLACK_WIN" || result === "DRAW") {
+    return buildGameResultSummary(result as GameResultCode, reason as GameResultReasonCode)
+  }
+
+  if (reason) {
+    return formatGameResultReason(reason as GameResultReasonCode)
+  }
+
   if (!result) {
     return "Result unavailable"
   }
@@ -276,7 +291,7 @@ export default function ProfilePage() {
                         const isFinished = game.status === "FINISHED"
                         const timestamp = game.updatedAt ?? game.createdAt
                         const meta = [
-                          formatResult(game.result),
+                          formatResult(game.result, game.resultReason),
                           game.timeControl,
                           timestamp
                             ? new Date(timestamp).toLocaleDateString(undefined, {

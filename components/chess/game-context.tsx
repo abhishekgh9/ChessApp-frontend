@@ -1,6 +1,6 @@
 "use client"
 
-import { createContext, ReactNode, useCallback, useContext, useEffect, useMemo, useState } from "react"
+import { createContext, ReactNode, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react"
 import { Chess, Square } from "chess.js"
 import { toast } from "sonner"
 
@@ -14,7 +14,8 @@ import {
   getErrorMessage,
   matchmakingApi,
 } from "@/lib/backend"
-import { createMovePayload, normalizePromotion, toChessMoveInput } from "@/lib/chess-move"
+import { createMovePayload, toChessMoveInput } from "@/lib/chess-move"
+import { buildGameResultSummary, formatGameResultReason, getWinnerFromResult } from "@/lib/game-result"
 
 import { useAuth } from "./auth-context"
 import { parseTimeControlToSeconds, useAppSettings } from "./settings-context"
@@ -107,30 +108,34 @@ function parseMoveToken(value: string): { from: string; to: string; promotion?: 
   return null
 }
 
-function applyVerboseMove(chess: Chess, move: GameMoveSummary) {
-  if (move.from && move.to) {
-    const promotion = normalizePromotion(move.promotion)
-    chess.move(
-      promotion
-        ? {
-            from: move.from as Square,
-            to: move.to as Square,
-            promotion,
-          }
-        : {
-            from: move.from as Square,
-            to: move.to as Square,
-          },
-    )
+function canLoadCanonicalFen(fen: string) {
+  try {
+    const chess = new Chess()
+    chess.load(fen)
     return true
+  } catch {
+    return false
+  }
+}
+
+function extractSanEntry(entry: string | GameMoveSummary) {
+  if (typeof entry === "string") {
+    const value = entry.trim()
+    if (!value) return null
+    if (parseMoveToken(value)) return null
+    return value
   }
 
-  if (move.san) {
-    chess.move(move.san)
-    return true
+  if (entry.san) {
+    const value = String(entry.san).trim()
+    return value || null
   }
 
-  return false
+  return null
+}
+
+function hasLegacyHistoryEntries(gameResponse: GameResponse) {
+  return gameResponse.history.some((entry) => extractSanEntry(entry) === null)
 }
 
 function buildChessFromGame(gameResponse: GameResponse | null) {
@@ -140,55 +145,25 @@ function buildChessFromGame(gameResponse: GameResponse | null) {
     return chess
   }
 
+  if (gameResponse.pgn.trim()) {
+    try {
+      const pgnChess = new Chess()
+      pgnChess.loadPgn(gameResponse.pgn)
+      if (pgnChess.fen() === gameResponse.fen) {
+        return pgnChess
+      }
+    } catch {
+      // Fallback to canonical FEN when PGN parsing fails.
+    }
+  }
+
   try {
     chess.load(gameResponse.fen)
     return chess
   } catch {
-    // Fall back to rebuilding from move history if the backend sends a transient placeholder FEN.
+    // Keep board stable when cached legacy payloads carry non-canonical fields.
+    return chess
   }
-
-  for (const move of gameResponse.history) {
-    try {
-      if (typeof move === "string") {
-        const parsed = parseMoveToken(move)
-        if (parsed) {
-          const promotion = normalizePromotion(parsed.promotion)
-          chess.move(
-            promotion
-              ? {
-                  from: parsed.from as Square,
-                  to: parsed.to as Square,
-                  promotion,
-                }
-              : {
-                  from: parsed.from as Square,
-                  to: parsed.to as Square,
-                },
-          )
-        } else {
-          chess.move(move)
-        }
-      } else {
-        applyVerboseMove(chess, move)
-      }
-    } catch {
-      // The backend's placeholder move/FEN quality can lag behind strict chess notation.
-      break
-    }
-  }
-
-  if (gameResponse.lastMove) {
-    const alreadyApplied = gameResponse.history.length > 0
-    if (!alreadyApplied) {
-      try {
-        applyVerboseMove(chess, gameResponse.lastMove)
-      } catch {
-        // Ignore malformed placeholder moves.
-      }
-    }
-  }
-
-  return chess
 }
 
 function mapHistory(gameResponse: GameResponse | null, fallback: Chess) {
@@ -196,33 +171,30 @@ function mapHistory(gameResponse: GameResponse | null, fallback: Chess) {
     return fallback.history()
   }
 
-  return gameResponse.history.map((entry) => {
-    if (typeof entry === "string") return entry
-    if (entry.san) return entry.san
-    if (entry.from && entry.to) return `${entry.from}-${entry.to}`
-    return "move"
-  })
+  const mapped = gameResponse.history
+    .map((entry) => extractSanEntry(entry))
+    .filter((entry): entry is string => Boolean(entry))
+
+  if (mapped.length > 0) {
+    return mapped
+  }
+
+  if (gameResponse.lastMove?.san) {
+    return [gameResponse.lastMove.san]
+  }
+
+  return []
 }
 
 function mapResult(gameResponse: GameResponse | null): GameResult | null {
   if (!gameResponse || gameResponse.status !== "FINISHED") return null
 
-  const result = gameResponse.result
-  const winner =
-    result === "WHITE_WIN" ? "white" : result === "BLACK_WIN" ? "black" : result === "DRAW" ? "draw" : null
-
-  const summary =
-    result === "WHITE_WIN"
-      ? "White wins."
-      : result === "BLACK_WIN"
-        ? "Black wins."
-        : result === "DRAW"
-          ? "Game drawn."
-          : "Game finished."
+  const winner = getWinnerFromResult(gameResponse.result)
+  const summary = buildGameResultSummary(gameResponse.result, gameResponse.resultReason)
 
   return {
     winner,
-    reason: gameResponse.resultReason?.replaceAll("_", " ").toLowerCase() ?? "completed",
+    reason: formatGameResultReason(gameResponse.resultReason),
     summary,
   }
 }
@@ -268,6 +240,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
   const [isSearchingMatch, setIsSearchingMatch] = useState(false)
   const [clockNow, setClockNow] = useState(() => Date.now())
   const [pendingClock, setPendingClock] = useState<PendingClockState | null>(null)
+  const legacyRefreshAttemptsRef = useRef(new Set<string>())
 
   const liveGame = useMemo(() => buildChessFromGame(currentGame), [currentGame])
   const game = currentGame ? liveGame : localGame
@@ -353,7 +326,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
     }
   }, [token, currentGame?.gameId])
 
-  const applyGameUpdate = useCallback(
+  const applyCanonicalGameState = useCallback(
     (gameResponse: GameResponse) => {
       setPendingClock(null)
       setCurrentGame(gameResponse)
@@ -383,6 +356,42 @@ export function GameProvider({ children }: { children: ReactNode }) {
       }
     },
     [boardOrientation, user],
+  )
+
+  const refreshLegacySnapshot = useCallback(
+    async (gameId: string) => {
+      if (!token || legacyRefreshAttemptsRef.current.has(gameId)) {
+        return
+      }
+
+      legacyRefreshAttemptsRef.current.add(gameId)
+      try {
+        const response = await gamesApi.get(token, gameId)
+        if (canLoadCanonicalFen(response.fen)) {
+          applyCanonicalGameState(response)
+          toast.info("Game state refreshed from server.")
+        }
+      } catch {
+        // Keep current stable state and avoid blocking the game UI.
+      }
+    },
+    [applyCanonicalGameState, token],
+  )
+
+  const applyGameUpdate = useCallback(
+    (gameResponse: GameResponse) => {
+      if (!canLoadCanonicalFen(gameResponse.fen)) {
+        void refreshLegacySnapshot(gameResponse.gameId)
+        return
+      }
+
+      applyCanonicalGameState(gameResponse)
+
+      if (hasLegacyHistoryEntries(gameResponse)) {
+        void refreshLegacySnapshot(gameResponse.gameId)
+      }
+    },
+    [applyCanonicalGameState, refreshLegacySnapshot],
   )
 
   const appendChatMessage = useCallback((message: GameChatMessageResponse) => {
@@ -641,7 +650,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
   const value = useMemo<GameContextType>(
     () => ({
       game,
-      fen: game.fen(),
+      fen: currentGame?.fen ?? game.fen(),
       backendFen: currentGame?.fen ?? null,
       history,
       evaluation,

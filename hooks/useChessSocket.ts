@@ -20,6 +20,10 @@ function isGameResponse(payload: unknown): payload is GameResponse {
     payload &&
       typeof payload === "object" &&
       "gameId" in payload &&
+      "fen" in payload &&
+      "pgn" in payload &&
+      "result" in payload &&
+      "resultReason" in payload &&
       "status" in payload &&
       "history" in payload &&
       "timeControl" in payload,

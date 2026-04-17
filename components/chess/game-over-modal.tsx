@@ -40,7 +40,7 @@ export function GameOverModal({ open, onOpenChange }: GameOverModalProps) {
             <div className="flex flex-col items-center">
               <span className="text-xs text-slate-500">Result</span>
               <div className="flex items-center gap-2">
-                <span className="text-lg font-semibold uppercase tracking-[0.18em] text-primary">
+                <span className="text-lg font-semibold text-primary">
                   {result?.reason ?? "completed"}
                 </span>
               </div>

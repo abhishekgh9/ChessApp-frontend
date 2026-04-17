@@ -76,6 +76,7 @@ function GameTab() {
   } = useGame()
   const { isAuthenticated, openAuthModal } = useAuth()
   const [pgnDraft, setPgnDraft] = useState("")
+  const currentPgn = exportPgn()
 
   const moves = useMemo(() => {
     const pairs: { number: number; white: string; black: string | null }[] = []
@@ -124,7 +125,7 @@ function GameTab() {
 
   return (
     <div className="flex h-full flex-col gap-4">
-      <SidePanel title="Move list" description="Readable notation with fast scanning for the current line.">
+      <SidePanel title="Move list" description="SAN notation from backend with fast scanning for current line.">
         <ScrollArea className="h-[220px] pr-2">
           {moves.length === 0 ? (
             <div className="flex h-36 flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-white/10 bg-white/[0.02] text-center">
@@ -248,6 +249,15 @@ function GameTab() {
         <Button onClick={handleImportPgn} className="mt-3 h-11 w-full">
           Load PGN
         </Button>
+      </SidePanel>
+
+      <SidePanel title="Current PGN" description="Backend PGN snapshot with headers, SAN moves, and result.">
+        <Textarea
+          value={currentPgn}
+          readOnly
+          className="control-base min-h-[180px] rounded-xl text-white"
+          placeholder="PGN will appear after game starts."
+        />
       </SidePanel>
     </div>
   )
